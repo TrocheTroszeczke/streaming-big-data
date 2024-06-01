@@ -46,6 +46,7 @@ groupedDF = dataDF \
 #                                        approx_count_distinct("character", 0.1).alias("no_characters"))
 
 dataDF.printSchema()
+# wrzucić do bazy sql tak jak jest w pdfie :)
 
 query = groupedDF.writeStream \
     .outputMode("complete") \
