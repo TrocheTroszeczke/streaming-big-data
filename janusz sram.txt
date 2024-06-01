@@ -1,0 +1,12 @@
+CLUSTER_NAME=$(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name)
+
+kafka-topics.sh --create \
+--bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
+--replication-factor 2 --partitions 3 --topic kafka-input
+
+java -cp /usr/lib/kafka/libs/*:KafkaProducer.jar \
+com.example.bigdata.TestProducer data 15 kafka-input \
+1 ${CLUSTER_NAME}-w-0:9092
+// 0 czy 1?
+
+$SPARK_HOME/bin/spark-submit   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0 simple_in_out.py
