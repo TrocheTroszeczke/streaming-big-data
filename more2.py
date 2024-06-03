@@ -20,12 +20,12 @@ ds1 = spark.readStream \
 ds1.printSchema()
 
 # Plik statyczny z nazwami spółek
-# symbolsDF = spark.read.format("csv") \
-#     .option("header", "true") \
-#     .option("inferSchema", "true") \
-#     .load("symbols_valid_meta.csv")
 #TODO parametr
-symbolsDF = spark.read.option("header", True).csv("gs://pojemnik/projekt2/movie_titles.csv")
+#symbolsDF = spark.read.format("csv") \
+#    .option("header", "true") \
+#    .option("inferSchema", "true") \
+#    .load("file:///pbd-cluster/home/anczachorek/symbols_valid_meta.csv")
+symbolsDF = spark.read.option("header", True).csv("gs://big-data-2023-ac/static_data/symbols_valid_meta.csv")
 symbolsDF.printSchema()
 
 valuesDF = ds1.select(expr("CAST(value AS STRING)").alias("value"))
@@ -36,15 +36,15 @@ dataDF = valuesDF.select(
     from_csv(col("value").cast(StringType()), schema)
     .alias("val")) \
     .select(col("val.Date"), col("val.Open"), col("val.High"), col("val.Low"), col("val.Close"),
-            col("val.Adj_close"), col("val.Volume"), col("val.Stock")) \
+            col("val.Adj_close"), col("val.Volume"), col("val.Stock").alias("Symbol")) \
     .withColumn("timestamp", to_timestamp("Date", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
 
-joinedDF = dataDF.join(symbolsDF, on="Stock", how="inner")
-
+joinedDF = dataDF.join(symbolsDF, on="Symbol", how="inner")
+joinedDF.printSchema()
 # Jeśli simple_in_out.py działa, to puścić to - cała schema csv zdefiniowana i groupby
 # TODO: join z nazwą (statycznym plikiem)
-groupedDF = dataDF \
-        .groupBy(window("timestamp", "30 days"), "Stock", "CompanyName") \
+groupedDF = joinedDF \
+        .groupBy(window("timestamp", "30 days"), "Symbol", "Security Name") \
         .agg(
             avg("Close").alias("avg_close"),
             min("Low").alias("lowest"),
