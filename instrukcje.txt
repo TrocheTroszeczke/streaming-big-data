@@ -1,3 +1,13 @@
+gcloud dataproc clusters create ${CLUSTER_NAME} \
+--enable-component-gateway --region ${REGION} --subnet default \
+--master-machine-type n1-standard-4 --master-boot-disk-size 50 \
+--num-workers 2 --worker-machine-type n1-standard-2 --worker-boot-disk-size 50 \
+--image-version 2.1-debian11 --optional-components DOCKER,ZOOKEEPER \
+--project ${PROJECT_ID} --max-age=2h \
+--metadata "run-on-master=true" \
+--initialization-actions \
+gs://goog-dataproc-initialization-actions-${REGION}/kafka/kafka.sh
+
 CLUSTER_NAME=$(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name)
 
 kafka-topics.sh --create \
@@ -7,6 +17,49 @@ kafka-topics.sh --create \
 java -cp /usr/lib/kafka/libs/*:KafkaProducer.jar \
 com.example.bigdata.TestProducer data 15 kafka-input \
 1 ${CLUSTER_NAME}-w-0:9092
-// 0 czy 1?
+// 0 czy 1? -> czy jest nagłówek? (ile linii ma skipnąć)
+
+kafka-console-consumer.sh --group my-consumer-group \
+ --bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
+ --topic kafka-topic --from-beginning
 
 $SPARK_HOME/bin/spark-submit   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0 more1.py
+
+$SPARK_HOME/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.2 \
+--driver-class-path postgresql-42.6.0.jar \
+--jars postgresql-42.6.0.jar more2.py
+
+wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
+
+pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.2 \
+--driver-class-path postgresql-42.6.0.jar \
+--jars postgresql-42.6.0.jar
+
+docker run --name postgresdb \
+-p 8432:5432 \
+-e POSTGRES_PASSWORD=mysecretpassword \
+-d postgres
+
+export PGPASSWORD='mysecretpassword'
+psql -h localhost -p 8432 -U postgres
+
+create database streamoutput;
+\c streamoutput;
+create table aggregations (
+    date varchar,
+    symbol character(30),
+    security_name character(200),
+    avg_close decimal,
+    lowest decimal,
+    highest decimal,
+    volume decimal,
+    PRIMARY KEY (date, symbol)
+);
+CREATE USER "user" WITH PASSWORD 'password';
+GRANT ALL PRIVILEGES ON DATABASE "streamoutput" TO "user";
+GRANT ALL PRIVILEGES ON TABLE "aggregations" TO "user";
+
+avg("Close").alias("avg_close"),
+            min("Low").alias("lowest"),
+            max("High").alias("highest"),
+            sum("Volume").alias("sum_volume")

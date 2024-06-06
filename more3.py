@@ -41,15 +41,14 @@ dataDF = valuesDF.select(
 
 joinedDF = dataDF.join(symbolsDF, on="Symbol", how="inner")
 joinedDF.printSchema()
-# Jeśli simple_in_out.py działa, to puścić to - cała schema csv zdefiniowana i groupby
-# TODO: join z nazwą (statycznym plikiem)
+
 groupedDF = joinedDF \
         .groupBy(window("timestamp", "30 days"), "Symbol", "Security Name") \
         .agg(
             avg("Close").alias("avg_close"),
             min("Low").alias("lowest"),
             max("High").alias("highest"),
-            sum("Volume").alias("sum_volume")
+            sum("Volume").alias("volume")
         )
 
 # TODO: powinno wyprintować do consoli
@@ -57,11 +56,33 @@ groupedDF = joinedDF \
 # resultDF = dataDF.groupBy("house").agg(count("score").alias("how_many"), sum("score").alias("sum_score"),
 #                                        approx_count_distinct("character", 0.1).alias("no_characters"))
 
-dataDF.printSchema()
+groupedDF.printSchema()
 # wrzucić do bazy sql tak jak jest w pdfie :)
 
-query = groupedDF.writeStream \
-    .outputMode("complete") \
-    .format("console") \
-    .start() \
-    .awaitTermination()
+# query = groupedDF.writeStream \
+#     .outputMode("complete") \
+#     .format("console") \
+#     .start() \
+#     .awaitTermination()
+
+streamWriter = groupedDF.writeStream.outputMode("complete").foreachBatch(
+    lambda batchDF, batchId:
+    batchDF.select(
+        col("window").cast("string").alias("date"),
+        col("avg_close"),
+        col("lowest"),
+        col("highest"),
+        col("volume")
+    ).write
+        .format("jdbc")
+        .mode("overwrite")
+        .option("url", f"jdbc:postgresql://{host_name}:8432/streamoutput")
+        .option("dbtable", "aggregations")
+        .option("user", "postgres")
+        .option("password", "mysecretpassword")
+        .option("truncate", "true")
+        .save()
+
+)
+
+query = streamWriter.start().awaitTermination()
