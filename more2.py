@@ -2,13 +2,16 @@ import socket
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import StringType, IntegerType
+import logging
 
+# Sesja Spark
 spark = SparkSession.builder \
     .appName("Stock Data") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
 
+# Wczytwanie danych
 # Strumień danych
 host_name = socket.gethostname()
 ds1 = spark.readStream \
@@ -16,20 +19,16 @@ ds1 = spark.readStream \
     .option("kafka.bootstrap.servers", f"{host_name}:9092") \
     .option("subscribe", "kafka-input") \
     .load()
-
+logging.info("Schemat danych otrzymywanych strumieniem danych")
 ds1.printSchema()
 
 # Plik statyczny z nazwami spółek
 #TODO parametr
-#symbolsDF = spark.read.format("csv") \
-#    .option("header", "true") \
-#    .option("inferSchema", "true") \
-#    .load("file:///pbd-cluster/home/anczachorek/symbols_valid_meta.csv")
 symbolsDF = spark.read.option("header", True).csv("gs://big-data-2023-ac/static_data/symbols_valid_meta.csv")
+logging.info("Schemat danych statycznych")
 symbolsDF.printSchema()
 
-valuesDF = ds1.select(expr("CAST(value AS STRING)").alias("value"))
-
+# Przygotowanie danych do agregacji: join dwóch źródeł danych
 schema = "Date STRING, Open DOUBLE, High DOUBLE, Low DOUBLE, Close DOUBLE, Adj_close STRING, Volume DOUBLE, Stock String"
 
 dataDF = valuesDF.select(
@@ -38,11 +37,14 @@ dataDF = valuesDF.select(
     .select(col("val.Date"), col("val.Open"), col("val.High"), col("val.Low"), col("val.Close"),
             col("val.Adj_close"), col("val.Volume"), col("val.Stock").alias("Symbol")) \
     .withColumn("timestamp", to_timestamp("Date", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+logging.info("Schemat danych otrzymywanych strumieniem danych po przetworzeniu")
+dataDF.printSchema()
 
 joinedDF = dataDF.join(symbolsDF, on="Symbol", how="inner")
+logging.info("Schemat danych po połączeniu dwóch źródeł danych")
 joinedDF.printSchema()
-# Jeśli simple_in_out.py działa, to puścić to - cała schema csv zdefiniowana i groupby
-# TODO: join z nazwą (statycznym plikiem)
+
+# Agregacje
 groupedDF = joinedDF \
         .groupBy(window("timestamp", "30 days"), "Symbol", "Security Name") \
         .agg(
@@ -51,14 +53,6 @@ groupedDF = joinedDF \
             max("High").alias("highest"),
             sum("Volume").alias("sum_volume")
         )
-
-# TODO: powinno wyprintować do consoli
-
-# resultDF = dataDF.groupBy("house").agg(count("score").alias("how_many"), sum("score").alias("sum_score"),
-#                                        approx_count_distinct("character", 0.1).alias("no_characters"))
-
-dataDF.printSchema()
-# wrzucić do bazy sql tak jak jest w pdfie :)
 
 query = groupedDF.writeStream \
     .outputMode("complete") \
