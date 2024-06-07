@@ -31,7 +31,7 @@ symbolsDF.printSchema()
 # Przygotowanie danych do agregacji: join dwóch źródeł danych
 schema = "Date STRING, Open DOUBLE, High DOUBLE, Low DOUBLE, Close DOUBLE, Adj_close STRING, Volume DOUBLE, Stock String"
 
-dataDF = valuesDF.select(
+dataDF = ds1.select(
     from_csv(col("value").cast(StringType()), schema)
     .alias("val")) \
     .select(col("val.Date"), col("val.Open"), col("val.High"), col("val.Low"), col("val.Close"),
@@ -45,7 +45,7 @@ logging.info("Schemat danych po połączeniu dwóch źródeł danych")
 joinedDF.printSchema()
 
 # Agregacje
-
+# TODO: parametry
 groupedDF = joinedDF \
         .groupBy(window("timestamp", "30 days"), "Symbol", "Security Name") \
         .agg(
@@ -54,11 +54,6 @@ groupedDF = joinedDF \
             max("High").alias("highest"),
             sum("Volume").alias("volume")
         )
-
-# TODO: powinno wyprintować do consoli
-
-# resultDF = dataDF.groupBy("house").agg(count("score").alias("how_many"), sum("score").alias("sum_score"),
-#                                        approx_count_distinct("character", 0.1).alias("no_characters"))
 
 groupedDF.printSchema()
 # wrzucić do bazy sql tak jak jest w pdfie :)
@@ -72,6 +67,8 @@ groupedDF.printSchema()
 streamWriter = groupedDF.writeStream.outputMode("complete").foreachBatch(
     lambda batchDF, batchId:
     batchDF.select(
+        col("Symbol").alias("symbol"),
+        col("Security Name").alias("security_name"),
         col("window").cast("string").alias("date"),
         col("avg_close"),
         col("lowest"),
@@ -86,7 +83,41 @@ streamWriter = groupedDF.writeStream.outputMode("complete").foreachBatch(
         .option("password", "mysecretpassword")
         .option("truncate", "true")
         .save()
-
 )
 
 query = streamWriter.start().awaitTermination()
+
+# anomalie
+# anomalies_window = joinedDF.withWatermark("date", "7 days") \
+#     .groupBy(window("date", "7 days", "1 day"), joinedDF.symbol) \
+#     .select(
+#         col("Symbol"),
+#         col("highest"),
+#         col("lowest"),
+#         date_format(col("window").start, "dd.MM.yyyy").alias("window_start"),
+#         date_format(col("window").end, "dd.MM.yyyy").alias("window_end"),
+#         ((col("highest") - col("lowest")) / col("highest")).alias("fluctuations_rate")
+#     )
+#
+# anomalies = anomalies_window.where(anomalies_window.fluctuations_rate > 0.4)
+# anomalies.print()
+#
+# #Format results for Kafka output
+# anomalies_formatted = anomalies.select(concat(
+#     col("window_start"),
+#     lit(","),
+#     col("window_end"),
+#     lit(","),
+#     col("Title"),
+#     lit(","),
+#     col("rate_count"),
+#     lit(","),
+#     col("avg_rate"),
+# ).alias("value"))
+#
+# anomalies_output = anomalies_formatted.writeStream \
+# .format("kafka") \
+# .option("kafka.bootstrap.servers", f"{host_name}:9092") \
+# .option("topic", "prj-2-anomalies") \
+# .option("checkpointLocation", "/tmp/anomaly_checkpoints/") \
+# .start()

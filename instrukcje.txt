@@ -2,8 +2,8 @@ gcloud dataproc clusters create ${CLUSTER_NAME} \
 --enable-component-gateway --region ${REGION} --subnet default \
 --master-machine-type n1-standard-4 --master-boot-disk-size 50 \
 --num-workers 2 --worker-machine-type n1-standard-2 --worker-boot-disk-size 50 \
---image-version 2.1-debian11 --optional-components DOCKER,ZOOKEEPER \
---project ${PROJECT_ID} --max-age=2h \
+--image-version 2.1-debian11 --optional-components JUPYTER,ZOOKEEPER,DOCKER \
+--project ${PROJECT_ID} --max-age=1h \
 --metadata "run-on-master=true" \
 --initialization-actions \
 gs://goog-dataproc-initialization-actions-${REGION}/kafka/kafka.sh
@@ -27,7 +27,7 @@ $SPARK_HOME/bin/spark-submit   --packages org.apache.spark:spark-sql-kafka-0-10_
 
 $SPARK_HOME/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.2 \
 --driver-class-path postgresql-42.6.0.jar \
---jars postgresql-42.6.0.jar more2.py
+--jars postgresql-42.6.0.jar more3.py
 
 wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
 
@@ -44,7 +44,9 @@ export PGPASSWORD='mysecretpassword'
 psql -h localhost -p 8432 -U postgres
 
 create database streamoutput;
+
 \c streamoutput;
+
 create table aggregations (
     date varchar,
     symbol character(30),
@@ -58,8 +60,3 @@ create table aggregations (
 CREATE USER "user" WITH PASSWORD 'password';
 GRANT ALL PRIVILEGES ON DATABASE "streamoutput" TO "user";
 GRANT ALL PRIVILEGES ON TABLE "aggregations" TO "user";
-
-avg("Close").alias("avg_close"),
-            min("Low").alias("lowest"),
-            max("High").alias("highest"),
-            sum("Volume").alias("sum_volume")
