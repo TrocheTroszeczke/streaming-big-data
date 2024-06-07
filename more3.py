@@ -45,17 +45,48 @@ logging.info("Schemat danych po połączeniu dwóch źródeł danych")
 joinedDF.printSchema()
 
 # Agregacje
+
 groupedDF = joinedDF \
         .groupBy(window("timestamp", "30 days"), "Symbol", "Security Name") \
         .agg(
             avg("Close").alias("avg_close"),
             min("Low").alias("lowest"),
             max("High").alias("highest"),
-            sum("Volume").alias("sum_volume")
+            sum("Volume").alias("volume")
         )
 
-query = groupedDF.writeStream \
-    .outputMode("complete") \
-    .format("console") \
-    .start() \
-    .awaitTermination()
+# TODO: powinno wyprintować do consoli
+
+# resultDF = dataDF.groupBy("house").agg(count("score").alias("how_many"), sum("score").alias("sum_score"),
+#                                        approx_count_distinct("character", 0.1).alias("no_characters"))
+
+groupedDF.printSchema()
+# wrzucić do bazy sql tak jak jest w pdfie :)
+
+# query = groupedDF.writeStream \
+#     .outputMode("complete") \
+#     .format("console") \
+#     .start() \
+#     .awaitTermination()
+
+streamWriter = groupedDF.writeStream.outputMode("complete").foreachBatch(
+    lambda batchDF, batchId:
+    batchDF.select(
+        col("window").cast("string").alias("date"),
+        col("avg_close"),
+        col("lowest"),
+        col("highest"),
+        col("volume")
+    ).write
+        .format("jdbc")
+        .mode("overwrite")
+        .option("url", f"jdbc:postgresql://{host_name}:8432/streamoutput")
+        .option("dbtable", "aggregations")
+        .option("user", "postgres")
+        .option("password", "mysecretpassword")
+        .option("truncate", "true")
+        .save()
+
+)
+
+query = streamWriter.start().awaitTermination()
