@@ -14,6 +14,10 @@ kafka-topics.sh --create \
 --bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
 --replication-factor 2 --partitions 3 --topic kafka-input
 
+kafka-topics.sh --create \
+--bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
+--replication-factor 2 --partitions 3 --topic anomalies
+
 java -cp /usr/lib/kafka/libs/*:KafkaProducer.jar \
 com.example.bigdata.TestProducer data 15 kafka-input \
 1 ${CLUSTER_NAME}-w-0:9092
@@ -21,19 +25,26 @@ com.example.bigdata.TestProducer data 15 kafka-input \
 
 kafka-console-consumer.sh --group my-consumer-group \
  --bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
- --topic kafka-topic --from-beginning
+ --topic anomalies --from-beginning
+
+ kafka-console-consumer.sh --group my-consumer-group \
+ --bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
+ --topic kafka-input --from-beginning
 
 $SPARK_HOME/bin/spark-submit   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0 more1.py
 
 $SPARK_HOME/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.2 \
 --driver-class-path postgresql-42.6.0.jar \
---jars postgresql-42.6.0.jar more3.py
+--jars postgresql-42.6.0.jar anomalies2.py
 
-wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
 
 pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.2 \
 --driver-class-path postgresql-42.6.0.jar \
 --jars postgresql-42.6.0.jar
+
+-------- POSTGRES ---------
+
+wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
 
 docker run --name postgresdb \
 -p 8432:5432 \
