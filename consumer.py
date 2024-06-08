@@ -57,7 +57,6 @@ def main():
     joinedDF.printSchema()
 
     # Agregacje
-    # TODO: parametry
     groupedDF = joinedDF \
             .groupBy(window("timestamp", "30 days"), "Symbol", "Security Name") \
             .agg(
@@ -69,11 +68,6 @@ def main():
 
     groupedDF.printSchema()
 
-    # query = groupedDF.writeStream \
-    #     .outputMode("complete") \
-    #     .format("console") \
-    #     .start() \
-    #     .awaitTermination()
 
     if mode == 'A':
         output_mode = "overwrite"
@@ -106,9 +100,11 @@ def main():
 
     query = streamWriter.start().awaitTermination()
 
+    days = str(d) + " days"
+
     # anomalie
-    anomalies_window = joinedDF.withWatermark("timestamp", "7 days") \
-        .groupBy(window("timestamp", "7 days", "1 day"), joinedDF.Symbol) \
+    anomalies_window = joinedDF.withWatermark("timestamp", days) \
+        .groupBy(window("timestamp", days, "1 day"), joinedDF.Symbol) \
         .agg(
             max("High").alias("highest"),
             min("Low").alias("lowest")) \

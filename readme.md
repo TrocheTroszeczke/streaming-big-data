@@ -1,6 +1,6 @@
 ## Jak uruchomić program?
 
-1. Uruchom klaster, załaduj potrzebne dane do bucketa i w pliku consumer.sh ustaw wartość parametrów. Dane zasilające strumień powinny znajdować się w folderze data i widoczne po uruchomieniu polecenia `ls data`
+1. Uruchom klaster, załaduj statyczne dane do bucketa i w pliku consumer.sh ustaw wartość parametrów. Dane zasilające strumień powinny znajdować się w folderze data i być widoczne po uruchomieniu polecenia `ls data`
 
 ``gcloud dataproc clusters create ${CLUSTER_NAME} \
 --enable-component-gateway --region ${REGION} --subnet default \
@@ -16,6 +16,8 @@ gs://goog-dataproc-initialization-actions-${REGION}/kafka/kafka.sh``
 
 ``source ./setup.sh``
 
+Po pytaniu o hasło należy wpisać: mysecretpassword
+
 3. Uruchom program konsumenta:
 
 ``source ./consumer.sh``
@@ -23,3 +25,19 @@ gs://goog-dataproc-initialization-actions-${REGION}/kafka/kafka.sh``
 4. W oddzielnym terminalu uruchom program producenta:
 
 ``source ./producer.sh``
+
+5. Żeby odczytać przetworzone dane, przejdź do terminala PostgreSQL i wypisz zawartość:
+
+``export PGPASSWORD='mysecretpassword'
+psql -h localhost -p 8432 -U postgres``
+
+``\c streamoutput;``
+
+``select * from aggregations;``
+
+6. Żeby odczytać dane o anomaliach, odczytaj dane z tematu Kafka `anomalies`, 
+np. za pomocą konsumenta wypisującego zawartość na konsolę:
+
+``kafka-console-consumer.sh --group my-consumer-group \
+ --bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
+ --topic anomalies --from-beginning``
