@@ -41,3 +41,7 @@ np. za pomocą konsumenta wypisującego zawartość na konsolę:
 ``kafka-console-consumer.sh --group my-consumer-group \
  --bootstrap-server ${CLUSTER_NAME}-w-1:9092 \
  --topic anomalies --from-beginning``
+
+7. Po zakończeniu programu, uruchom skrypt czyszczący środowisko:
+
+``source ./cleanup.sh``

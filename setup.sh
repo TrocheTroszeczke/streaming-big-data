@@ -3,7 +3,7 @@
 # Zakładam, że pliki znajdują się w buckecie w folderze wskazanym parametrem
 # (dla strumienia znajdują się w podfolderze data)
 
-# Ustaw zmienne środowiskowe (w tym parametry)
+# Ustaw zmienne środowiskowe (parametry)
 source ./env.sh
 echo "Ustwiono wartości zmiennych środowiskowych."
 
